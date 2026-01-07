@@ -23,6 +23,7 @@ namespace CatDrop3D.Inventory3D
         public int Width => width;
         public int Height => height;
         public float CellSize => cellSize;
+        public Transform Frame => origin != null ? origin : transform;
 
         private void Awake()
         {
@@ -38,18 +39,17 @@ namespace CatDrop3D.Inventory3D
 
         public Vector3 CellToWorld(Vector2Int cell)
         {
-            var basePos = origin != null ? origin.position : transform.position;
-            return basePos + new Vector3(cell.x * cellSize, 0f, cell.y * cellSize);
+            var frame = Frame;
+            var localPos = new Vector3(cell.x * cellSize, 0f, cell.y * cellSize);
+            return frame.TransformPoint(localPos);
         }
 
         public Vector2Int WorldToCell(Vector3 world)
         {
-            var basePos = origin != null ? origin.position : transform.position;
-            var local = world - basePos;
-
+            var frame = Frame;
+            var local = frame.InverseTransformPoint(world);
             int x = Mathf.RoundToInt(local.x / cellSize);
             int y = Mathf.RoundToInt(local.z / cellSize);
-
             return new Vector2Int(x, y);
         }
 
@@ -94,8 +94,11 @@ namespace CatDrop3D.Inventory3D
             }
 
             item.EnsureVisuals(cellSize);
-            var pos = CellToWorld(originCell);
-            item.transform.position = new Vector3(pos.x, pos.y + item.YOffset, pos.z);
+            var frame = Frame;
+            // Parent the item under the grid while preserving world rotation/scale.
+            item.transform.SetParent(frame, worldPositionStays: true);
+            var localPos = new Vector3(originCell.x * cellSize, item.YOffset, originCell.y * cellSize);
+            item.transform.localPosition = localPos;
         }
 
         public void Remove(InventoryItem3D item)
@@ -114,6 +117,12 @@ namespace CatDrop3D.Inventory3D
                         occupancy[x, y] = null;
                     }
                 }
+            }
+
+            // Detach from grid parent when removed.
+            if (item.transform != null && item.transform.parent == Frame)
+            {
+                item.transform.SetParent(null, worldPositionStays: true);
             }
         }
 
@@ -170,22 +179,19 @@ namespace CatDrop3D.Inventory3D
 
         private void OnDrawGizmosSelected()
         {
-            if (origin == null)
-            {
-                return;
-            }
-
+            var frame = Frame;
             Gizmos.color = new Color(0f, 1f, 1f, 0.25f);
-            var basePos = origin.position;
-
+            var prevMatrix = Gizmos.matrix;
+            Gizmos.matrix = frame.localToWorldMatrix;
             for (int x = 0; x < width; x++)
             {
                 for (int y = 0; y < height; y++)
                 {
-                    var p = basePos + new Vector3(x * cellSize, 0f, y * cellSize);
+                    var p = new Vector3(x * cellSize, 0f, y * cellSize);
                     Gizmos.DrawWireCube(p, new Vector3(cellSize, 0.01f, cellSize));
                 }
             }
+            Gizmos.matrix = prevMatrix;
         }
     }
 }

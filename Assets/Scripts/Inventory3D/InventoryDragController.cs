@@ -43,7 +43,7 @@ namespace CatDrop3D.Inventory3D
         private InventoryItem3D draggingItem;
         private Vector2Int dragStartCell;
         private Vector2Int lastValidCell;
-        private Plane gridPlane;
+        // No longer store a fixed world-up plane; the grid can rotate.
 
         private Vector3 smoothVelocity;
 
@@ -62,11 +62,7 @@ namespace CatDrop3D.Inventory3D
                 grid = FindFirstObjectByType<InventoryGrid3D>();
             }
 
-            if (grid != null)
-            {
-                // Grid assumed on XZ plane.
-                gridPlane = new Plane(Vector3.up, grid.transform.position);
-            }
+            // Plane is computed per frame from the grid's oriented transform.
         }
 
         private void OnEnable()
@@ -166,7 +162,9 @@ namespace CatDrop3D.Inventory3D
         {
             var screenPos = GetPointerScreenPosition();
             var ray = targetCamera.ScreenPointToRay(screenPos);
-            if (!gridPlane.Raycast(ray, out float enter))
+            var frame = grid.Frame;
+            var plane = new Plane(frame.up, frame.position);
+            if (!plane.Raycast(ray, out float enter))
             {
                 return;
             }
@@ -182,9 +180,12 @@ namespace CatDrop3D.Inventory3D
             var resolvedCell = ResolveBlockingMovement(lastValidCell, snappedCell);
             lastValidCell = resolvedCell;
 
-            var pos = grid.CellToWorld(resolvedCell);
-
-            var target = new Vector3(pos.x, pos.y + draggingItem.YOffset + dragLift, pos.z);
+            // Lift along the grid's local up by transforming a local position.
+            var localPos = new Vector3(
+                resolvedCell.x * grid.CellSize,
+                draggingItem.YOffset + dragLift,
+                resolvedCell.y * grid.CellSize);
+            var target = frame.TransformPoint(localPos);
 
             if (!smoothSnapping)
             {
@@ -248,10 +249,12 @@ namespace CatDrop3D.Inventory3D
                 // Restore to start.
                 if (!grid.CanPlace(draggingItem, dragStartCell))
                 {
-                    // If start cell became blocked somehow, just try to place nowhere (leave item where it is).
-                    // But keep it lifted down to grid height.
-                    var pos = grid.CellToWorld(lastValidCell);
-                    draggingItem.transform.position = new Vector3(pos.x, pos.y + draggingItem.YOffset, pos.z);
+                    // If start cell became blocked somehow, keep item where it is,
+                    // but align height along grid's local up.
+                    var frame2 = grid.Frame;
+                    var localP = new Vector3(lastValidCell.x * grid.CellSize, draggingItem.YOffset, lastValidCell.y * grid.CellSize);
+                    var worldP = frame2.TransformPoint(localP);
+                    draggingItem.transform.position = worldP;
                     draggingItem = null;
                     return;
                 }
