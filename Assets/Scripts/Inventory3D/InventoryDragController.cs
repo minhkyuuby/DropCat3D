@@ -223,7 +223,11 @@ namespace CatDrop3D.Inventory3D
 
             Vector2Int lastPlaceable = fromCell;
 
-            foreach (var step in GridDragMath.StepLine(fromCell, toCell))
+            // Only allow 4-way (axis-aligned) movement checks so we can't "pass through" diagonals.
+            // Choose an order based on dominant movement axis to feel natural while dragging.
+            bool xFirst = Mathf.Abs(toCell.x - fromCell.x) >= Mathf.Abs(toCell.y - fromCell.y);
+
+            foreach (var step in GridDragMath.StepAxisAligned(fromCell, toCell, xFirst))
             {
                 if (!grid.CanPlace(draggingItem, step))
                 {

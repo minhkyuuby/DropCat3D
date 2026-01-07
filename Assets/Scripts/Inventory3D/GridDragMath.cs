@@ -52,5 +52,56 @@ namespace CatDrop3D.Inventory3D
                 yield return new Vector2Int(x, y);
             }
         }
+
+        // Axis-aligned (4-way) stepping for 2D grid.
+        // Yields a sequence of intermediate cells from start (exclusive) to end (inclusive).
+        // This prevents diagonal "corner cutting" by only changing one axis per step.
+        public static System.Collections.Generic.IEnumerable<Vector2Int> StepAxisAligned(Vector2Int start, Vector2Int end, bool xFirst)
+        {
+            int x = start.x;
+            int y = start.y;
+
+            int x1 = end.x;
+            int y1 = end.y;
+
+            int sx = x < x1 ? 1 : -1;
+            int sy = y < y1 ? 1 : -1;
+
+            if (x == x1)
+            {
+                xFirst = false;
+            }
+            else if (y == y1)
+            {
+                xFirst = true;
+            }
+
+            if (xFirst)
+            {
+                while (x != x1)
+                {
+                    x += sx;
+                    yield return new Vector2Int(x, y);
+                }
+                while (y != y1)
+                {
+                    y += sy;
+                    yield return new Vector2Int(x, y);
+                }
+            }
+            else
+            {
+                while (y != y1)
+                {
+                    y += sy;
+                    yield return new Vector2Int(x, y);
+                }
+                while (x != x1)
+                {
+                    x += sx;
+                    yield return new Vector2Int(x, y);
+                }
+            }
+        }
     }
 }
