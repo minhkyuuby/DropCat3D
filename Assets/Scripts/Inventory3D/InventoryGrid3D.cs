@@ -34,6 +34,14 @@ namespace CatDrop3D.Inventory3D
             occupancy = new InventoryItem3D[width, height];
         }
 
+        private void EnsureInitialized()
+        {
+            if (occupancy == null || occupancy.GetLength(0) != width || occupancy.GetLength(1) != height)
+            {
+                occupancy = new InventoryItem3D[width, height];
+            }
+        }
+
         public bool IsInBounds(Vector2Int cell)
             => cell.x >= 0 && cell.x < width && cell.y >= 0 && cell.y < height;
 
@@ -55,6 +63,7 @@ namespace CatDrop3D.Inventory3D
 
         public bool CanPlace(InventoryItem3D item, Vector2Int originCell)
         {
+            EnsureInitialized();
             if (item == null)
             {
                 return false;
@@ -78,6 +87,7 @@ namespace CatDrop3D.Inventory3D
 
         public void Place(InventoryItem3D item, Vector2Int originCell)
         {
+            EnsureInitialized();
             if (item == null)
             {
                 throw new ArgumentNullException(nameof(item));
@@ -103,6 +113,7 @@ namespace CatDrop3D.Inventory3D
 
         public void Remove(InventoryItem3D item)
         {
+            EnsureInitialized();
             if (item == null || occupancy == null)
             {
                 return;
@@ -128,6 +139,7 @@ namespace CatDrop3D.Inventory3D
 
         public bool TryFindOriginCell(InventoryItem3D item, out Vector2Int originCell)
         {
+            EnsureInitialized();
             originCell = default;
             if (item == null || occupancy == null)
             {
@@ -192,6 +204,31 @@ namespace CatDrop3D.Inventory3D
                 }
             }
             Gizmos.matrix = prevMatrix;
+        }
+
+        public void RebuildOccupancyFromItems()
+        {
+            EnsureInitialized();
+            Array.Clear(occupancy, 0, occupancy.Length);
+
+            var items = GetComponentsInChildren<InventoryItem3D>(includeInactive: true);
+            for (int i = 0; i < items.Length; i++)
+            {
+                var item = items[i];
+                if (item == null)
+                {
+                    continue;
+                }
+
+                var originCell = WorldToCell(item.transform.position);
+                foreach (var cell in item.OccupiedCells(originCell))
+                {
+                    if (IsInBounds(cell))
+                    {
+                        occupancy[cell.x, cell.y] = item;
+                    }
+                }
+            }
         }
     }
 }
