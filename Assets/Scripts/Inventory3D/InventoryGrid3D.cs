@@ -18,12 +18,22 @@ namespace CatDrop3D.Inventory3D
         [Tooltip("World-space origin at cell (0,0) center.")]
         [SerializeField] private Transform origin;
 
+        [Header("Boundary")]
+        [SerializeField, HideInInspector] private bool useBoundaryMask;
+
+        [SerializeField, HideInInspector] private bool[] boundaryMask = Array.Empty<bool>();
+
+        [SerializeField, HideInInspector] private int maskWidth;
+
+        [SerializeField, HideInInspector] private int maskHeight;
+
         private InventoryItem3D[,] occupancy;
 
         public int Width => width;
         public int Height => height;
         public float CellSize => cellSize;
         public Transform Frame => origin != null ? origin : transform;
+        public bool UseBoundaryMask => useBoundaryMask;
 
         private void Awake()
         {
@@ -31,7 +41,17 @@ namespace CatDrop3D.Inventory3D
             {
                 origin = transform;
             }
+            EnsureBoundaryMask();
             occupancy = new InventoryItem3D[width, height];
+        }
+
+        private void OnValidate()
+        {
+            if (origin == null)
+            {
+                origin = transform;
+            }
+            EnsureBoundaryMask();
         }
 
         private void EnsureInitialized()
@@ -40,10 +60,26 @@ namespace CatDrop3D.Inventory3D
             {
                 occupancy = new InventoryItem3D[width, height];
             }
+            EnsureBoundaryMask();
         }
 
         public bool IsInBounds(Vector2Int cell)
             => cell.x >= 0 && cell.x < width && cell.y >= 0 && cell.y < height;
+
+        public bool IsCellValid(Vector2Int cell)
+        {
+            if (!IsInBounds(cell))
+            {
+                return false;
+            }
+
+            if (useBoundaryMask && !GetMaskCell(cell.x, cell.y))
+            {
+                return false;
+            }
+
+            return true;
+        }
 
         public Vector3 CellToWorld(Vector2Int cell)
         {
@@ -71,7 +107,7 @@ namespace CatDrop3D.Inventory3D
 
             foreach (var cell in item.OccupiedCells(originCell))
             {
-                if (!IsInBounds(cell))
+                if (!IsCellValid(cell))
                 {
                     return false;
                 }
@@ -83,6 +119,17 @@ namespace CatDrop3D.Inventory3D
             }
 
             return true;
+        }
+
+        public InventoryItem3D GetCellItem(int x, int y)
+        {
+            EnsureInitialized();
+            if (x < 0 || x >= width || y < 0 || y >= height)
+            {
+                return null;
+            }
+
+            return occupancy[x, y];
         }
 
         public void Place(InventoryItem3D item, Vector2Int originCell)
@@ -201,6 +248,12 @@ namespace CatDrop3D.Inventory3D
                 {
                     var p = new Vector3(x * cellSize, 0f, y * cellSize);
                     Gizmos.DrawWireCube(p, new Vector3(cellSize, 0.01f, cellSize));
+                    if (!IsCellValid(new Vector2Int(x, y)))
+                    {
+                        Gizmos.color = new Color(1f, 0.2f, 0.2f, 0.2f);
+                        Gizmos.DrawCube(p, new Vector3(cellSize, 0.005f, cellSize));
+                        Gizmos.color = new Color(0f, 1f, 1f, 0.25f);
+                    }
                 }
             }
             Gizmos.matrix = prevMatrix;
@@ -223,12 +276,87 @@ namespace CatDrop3D.Inventory3D
                 var originCell = WorldToCell(item.transform.position);
                 foreach (var cell in item.OccupiedCells(originCell))
                 {
-                    if (IsInBounds(cell))
+                    if (IsCellValid(cell))
                     {
                         occupancy[cell.x, cell.y] = item;
                     }
                 }
             }
         }
+
+        public void SetBoundaryMaskEnabled(bool enabled)
+        {
+            useBoundaryMask = enabled;
+        }
+
+        public bool GetBoundaryMaskCell(int x, int y)
+        {
+            EnsureBoundaryMask();
+            if (x < 0 || x >= width || y < 0 || y >= height)
+            {
+                return false;
+            }
+
+            return GetMaskCell(x, y);
+        }
+
+        public void SetBoundaryMaskCell(int x, int y, bool enabled)
+        {
+            EnsureBoundaryMask();
+            if (x < 0 || x >= width || y < 0 || y >= height)
+            {
+                return;
+            }
+
+            boundaryMask[y * width + x] = enabled;
+        }
+
+
+        private void EnsureBoundaryMask()
+        {
+            int size = Mathf.Max(0, width * height);
+            if (boundaryMask == null || boundaryMask.Length != size || maskWidth != width || maskHeight != height)
+            {
+                var oldMask = boundaryMask;
+                int oldWidth = maskWidth;
+                int oldHeight = maskHeight;
+                boundaryMask = new bool[size];
+
+                for (int i = 0; i < boundaryMask.Length; i++)
+                {
+                    boundaryMask[i] = true;
+                }
+
+                if (oldMask != null && oldMask.Length > 0 && oldWidth > 0 && oldHeight > 0)
+                {
+                    int copyWidth = Mathf.Min(oldWidth, width);
+                    int copyHeight = Mathf.Min(oldHeight, height);
+                    for (int y = 0; y < copyHeight; y++)
+                    {
+                        for (int x = 0; x < copyWidth; x++)
+                        {
+                            int oldIndex = y * oldWidth + x;
+                            int newIndex = y * width + x;
+                            boundaryMask[newIndex] = oldMask[oldIndex];
+                        }
+                    }
+                }
+
+                maskWidth = width;
+                maskHeight = height;
+            }
+        }
+
+        private bool GetMaskCell(int x, int y)
+        {
+            int index = y * width + x;
+            if (boundaryMask == null || index < 0 || index >= boundaryMask.Length)
+            {
+                return false;
+            }
+
+            return boundaryMask[index];
+        }
+
     }
 }
