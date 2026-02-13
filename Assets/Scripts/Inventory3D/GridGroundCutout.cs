@@ -74,11 +74,12 @@ namespace CatDrop3D.Inventory3D
             }
 
             var frame = grid.Frame;
-            float half = grid.CellSize * 0.5f;
-            float minX = -half;
-            float minZ = -half;
-            float maxX = (grid.Width - 1) * grid.CellSize + half;
-            float maxZ = (grid.Height - 1) * grid.CellSize + half;
+            float extentX = grid.Width * grid.CellSize * 0.5f;
+            float extentZ = grid.Height * grid.CellSize * 0.5f;
+            float minX = -extentX;
+            float minZ = -extentZ;
+            float maxX = extentX;
+            float maxZ = extentZ;
 
             if (useBoundaryMask)
             {

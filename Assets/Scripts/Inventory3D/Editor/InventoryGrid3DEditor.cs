@@ -247,7 +247,7 @@ namespace CatDrop3D.Inventory3D.Editor
 
         private static void MoveItemToCell(InventoryGrid3D grid, InventoryItem3D item, Vector2Int cell)
         {
-            var localPos = new Vector3(cell.x * grid.CellSize, item.YOffset, cell.y * grid.CellSize);
+            var localPos = grid.CellToLocal(cell, item.YOffset);
             var worldPos = grid.Frame.TransformPoint(localPos);
             item.transform.position = worldPos;
         }

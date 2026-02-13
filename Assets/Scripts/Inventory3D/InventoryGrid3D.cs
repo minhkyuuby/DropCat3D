@@ -15,7 +15,7 @@ namespace CatDrop3D.Inventory3D
         [Min(0.01f)]
         [SerializeField] private float cellSize = 1f;
 
-        [Tooltip("World-space origin at cell (0,0) center.")]
+        [Tooltip("World-space origin at grid center.")]
         [SerializeField] private Transform origin;
 
         [Header("Boundary")]
@@ -34,6 +34,14 @@ namespace CatDrop3D.Inventory3D
         public float CellSize => cellSize;
         public Transform Frame => origin != null ? origin : transform;
         public bool UseBoundaryMask => useBoundaryMask;
+
+        private Vector3 GridCenterOffsetLocal
+            => new Vector3((width - 1) * cellSize * 0.5f, 0f, (height - 1) * cellSize * 0.5f);
+
+        public Vector3 CellToLocal(Vector2Int cell, float y = 0f)
+        {
+            return new Vector3(cell.x * cellSize, y, cell.y * cellSize) - GridCenterOffsetLocal;
+        }
 
         private void Awake()
         {
@@ -84,14 +92,14 @@ namespace CatDrop3D.Inventory3D
         public Vector3 CellToWorld(Vector2Int cell)
         {
             var frame = Frame;
-            var localPos = new Vector3(cell.x * cellSize, 0f, cell.y * cellSize);
+            var localPos = CellToLocal(cell, 0f);
             return frame.TransformPoint(localPos);
         }
 
         public Vector2Int WorldToCell(Vector3 world)
         {
             var frame = Frame;
-            var local = frame.InverseTransformPoint(world);
+            var local = frame.InverseTransformPoint(world) + GridCenterOffsetLocal;
             int x = Mathf.RoundToInt(local.x / cellSize);
             int y = Mathf.RoundToInt(local.z / cellSize);
             return new Vector2Int(x, y);
@@ -154,7 +162,7 @@ namespace CatDrop3D.Inventory3D
             var frame = Frame;
             // Parent the item under the grid while preserving world rotation/scale.
             item.transform.SetParent(frame, worldPositionStays: true);
-            var localPos = new Vector3(originCell.x * cellSize, item.YOffset, originCell.y * cellSize);
+            var localPos = CellToLocal(originCell, item.YOffset);
             item.transform.localPosition = localPos;
         }
 
@@ -242,11 +250,12 @@ namespace CatDrop3D.Inventory3D
             Gizmos.color = new Color(0f, 1f, 1f, 0.25f);
             var prevMatrix = Gizmos.matrix;
             Gizmos.matrix = frame.localToWorldMatrix;
+            var offset = GridCenterOffsetLocal;
             for (int x = 0; x < width; x++)
             {
                 for (int y = 0; y < height; y++)
                 {
-                    var p = new Vector3(x * cellSize, 0f, y * cellSize);
+                    var p = new Vector3(x * cellSize, 0f, y * cellSize) - offset;
                     Gizmos.DrawWireCube(p, new Vector3(cellSize, 0.01f, cellSize));
                     if (!IsCellValid(new Vector2Int(x, y)))
                     {
