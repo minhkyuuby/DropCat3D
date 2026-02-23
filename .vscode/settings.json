@@ -66,5 +66,5 @@
     "explorer.fileNesting.patterns": {
         "*.sln": "*.csproj"
     },
-    "dotnet.defaultSolution": "DropCat3D.sln"
+    "dotnet.defaultSolution": "DropCat3D.slnx"
 }

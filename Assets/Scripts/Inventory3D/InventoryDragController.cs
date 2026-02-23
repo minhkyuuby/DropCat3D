@@ -180,11 +180,8 @@ namespace CatDrop3D.Inventory3D
             var resolvedCell = ResolveBlockingMovement(lastValidCell, snappedCell);
             lastValidCell = resolvedCell;
 
-            // Lift along the grid's local up by transforming a local position.
-            var localPos = new Vector3(
-                resolvedCell.x * grid.CellSize,
-                draggingItem.YOffset + dragLift,
-                resolvedCell.y * grid.CellSize);
+            // Lift along the grid's local up while honoring the grid's center offset.
+            var localPos = grid.CellToLocal(resolvedCell, draggingItem.YOffset + dragLift);
             var target = frame.TransformPoint(localPos);
 
             if (!smoothSnapping)
@@ -256,7 +253,7 @@ namespace CatDrop3D.Inventory3D
                     // If start cell became blocked somehow, keep item where it is,
                     // but align height along grid's local up.
                     var frame2 = grid.Frame;
-                    var localP = new Vector3(lastValidCell.x * grid.CellSize, draggingItem.YOffset, lastValidCell.y * grid.CellSize);
+                    var localP = grid.CellToLocal(lastValidCell, draggingItem.YOffset);
                     var worldP = frame2.TransformPoint(localP);
                     draggingItem.transform.position = worldP;
                     draggingItem = null;
