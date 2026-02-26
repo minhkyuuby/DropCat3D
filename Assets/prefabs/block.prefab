@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 8782084221810639644}
   - component: {fileID: 8088102592480084635}
   m_Layer: 0
-  m_Name: Sphere
+  m_Name: block
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -91,6 +91,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!135 &8782084221810639644
 SphereCollider:
@@ -126,6 +127,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CatDrop3D.Inventory3D.InventoryItem3D
   template: {fileID: 11400000, guid: 512738373a8462f4cb0db933d26d0b04, type: 2}
+  blocksGrid: 1
+  draggableAtRuntime: 1
   blockPrefab: {fileID: 0}
   yOffset: 0.05
 --- !u!1 &5277674089000850798
@@ -238,4 +241,5 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}

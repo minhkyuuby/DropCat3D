@@ -22,7 +22,12 @@ namespace CatDrop3D.Inventory3D.Editor
             DrawScriptReference();
 
             EditorGUILayout.PropertyField(serializedObject.FindProperty("template"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("autoVisualizeWithBlock"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("blockPrefab"));
+
+            
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("draggableAtRuntime"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("blocksGrid"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("yOffset"));
 
             DrawInstanceButton();
@@ -53,7 +58,7 @@ namespace CatDrop3D.Inventory3D.Editor
                     ClearBlocks(item);
 
                     Undo.RecordObject(item.transform, "Instance Block Prefab");
-                    item.EnsureVisuals(cellSize);
+                    item.EnsureVisuals(cellSize, force: true);
                     EditorUtility.SetDirty(item);
                 }
             }

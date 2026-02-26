@@ -142,6 +142,11 @@ namespace CatDrop3D.Inventory3D
                 return;
             }
 
+            if (Application.isPlaying && !item.DraggableAtRuntime)
+            {
+                return;
+            }
+
             draggingItem = item;
 
             if (!grid.TryFindOriginCell(item, out dragStartCell))

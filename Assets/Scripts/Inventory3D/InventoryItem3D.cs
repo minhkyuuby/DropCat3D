@@ -6,6 +6,14 @@ namespace CatDrop3D.Inventory3D
     public sealed class InventoryItem3D : MonoBehaviour
     {
         [SerializeField] private BlockShapeTemplate template;
+        public bool autoVisualizeWithBlock = true;
+
+        [Header("Behavior")]
+        [Tooltip("If false, the item can sit on the grid without blocking other items.")]
+        [SerializeField] private bool blocksGrid = true;
+
+        [Tooltip("If false, the player cannot drag this item during play mode.")]
+        [SerializeField] private bool draggableAtRuntime = true;
 
         [Header("Visuals")]
         [Tooltip("Optional prefab used for each block. If null, Unity cube primitives are used.")]
@@ -15,6 +23,8 @@ namespace CatDrop3D.Inventory3D
         [SerializeField] private float yOffset = 0.05f;
 
         public BlockShapeTemplate Template => template;
+        public bool BlocksGrid => blocksGrid;
+        public bool DraggableAtRuntime => draggableAtRuntime;
 
         public void SetTemplate(BlockShapeTemplate newTemplate)
         {
@@ -42,8 +52,9 @@ namespace CatDrop3D.Inventory3D
             }
         }
 
-        public void EnsureVisuals(float cellSize)
+        public void EnsureVisuals(float cellSize, bool force = false)
         {
+            if (!force && !autoVisualizeWithBlock) return;
             if (template == null)
             {
                 return;

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace CatDrop3D.Inventory3D
@@ -28,6 +29,7 @@ namespace CatDrop3D.Inventory3D
         [SerializeField, HideInInspector] private int maskHeight;
 
         private InventoryItem3D[,] occupancy;
+        private List<FrogItem3D>[,] frogOccupancy;
 
         public int Width => width;
         public int Height => height;
@@ -67,6 +69,10 @@ namespace CatDrop3D.Inventory3D
             if (occupancy == null || occupancy.GetLength(0) != width || occupancy.GetLength(1) != height)
             {
                 occupancy = new InventoryItem3D[width, height];
+            }
+            if (frogOccupancy == null || frogOccupancy.GetLength(0) != width || frogOccupancy.GetLength(1) != height)
+            {
+                frogOccupancy = new List<FrogItem3D>[width, height];
             }
             EnsureBoundaryMask();
         }
@@ -120,7 +126,7 @@ namespace CatDrop3D.Inventory3D
                     return false;
                 }
 
-                if (occupancy[cell.x, cell.y] != null)
+                if (item.BlocksGrid && occupancy[cell.x, cell.y] != null)
                 {
                     return false;
                 }
@@ -153,9 +159,12 @@ namespace CatDrop3D.Inventory3D
                 throw new InvalidOperationException($"Cannot place item at {originCell}.");
             }
 
-            foreach (var cell in item.OccupiedCells(originCell))
+            if (item.BlocksGrid)
             {
-                occupancy[cell.x, cell.y] = item;
+                foreach (var cell in item.OccupiedCells(originCell))
+                {
+                    occupancy[cell.x, cell.y] = item;
+                }
             }
 
             item.EnsureVisuals(cellSize);
@@ -164,6 +173,73 @@ namespace CatDrop3D.Inventory3D
             item.transform.SetParent(frame, worldPositionStays: true);
             var localPos = CellToLocal(originCell, item.YOffset);
             item.transform.localPosition = localPos;
+
+            var slot = item.GetComponent<PlatformSlot3D>();
+            if (slot != null && slot.ResolveFrogsOnPlace)
+            {
+                slot.ResolveFrogsInCell();
+            }
+        }
+
+        public bool RegisterFrog(FrogItem3D frog, Vector2Int cell)
+        {
+            EnsureInitialized();
+            if (frog == null)
+            {
+                return false;
+            }
+
+            if (!IsCellValid(cell))
+            {
+                return false;
+            }
+
+            var list = frogOccupancy[cell.x, cell.y];
+            if (list == null)
+            {
+                list = new List<FrogItem3D>();
+                frogOccupancy[cell.x, cell.y] = list;
+            }
+
+            if (!list.Contains(frog))
+            {
+                list.Add(frog);
+            }
+
+            return true;
+        }
+
+        public void UnregisterFrog(FrogItem3D frog, Vector2Int cell)
+        {
+            EnsureInitialized();
+            if (frog == null)
+            {
+                return;
+            }
+
+            if (!IsInBounds(cell))
+            {
+                return;
+            }
+
+            var list = frogOccupancy[cell.x, cell.y];
+            if (list == null)
+            {
+                return;
+            }
+
+            list.Remove(frog);
+        }
+
+        public IReadOnlyList<FrogItem3D> GetFrogsInCell(Vector2Int cell)
+        {
+            EnsureInitialized();
+            if (!IsInBounds(cell))
+            {
+                return null;
+            }
+
+            return frogOccupancy[cell.x, cell.y];
         }
 
         public void Remove(InventoryItem3D item)
@@ -171,6 +247,15 @@ namespace CatDrop3D.Inventory3D
             EnsureInitialized();
             if (item == null || occupancy == null)
             {
+                return;
+            }
+
+            if (!item.BlocksGrid)
+            {
+                if (item.transform != null && item.transform.parent == Frame)
+                {
+                    item.transform.SetParent(null, worldPositionStays: true);
+                }
                 return;
             }
 
@@ -278,6 +363,11 @@ namespace CatDrop3D.Inventory3D
             {
                 var item = items[i];
                 if (item == null)
+                {
+                    continue;
+                }
+
+                if (!item.BlocksGrid)
                 {
                     continue;
                 }
