@@ -1,6 +1,6 @@
 namespace CatDrop3D.Inventory3D
 {
-    public enum FrogType
+    public enum BallType
     {
         Green,
         Red,

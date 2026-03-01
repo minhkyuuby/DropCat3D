@@ -2,11 +2,11 @@ using UnityEngine;
 
 namespace CatDrop3D.Inventory3D
 {
-    public sealed class FrogItem3D : MonoBehaviour
+    public sealed class BallItem3D : MonoBehaviour
     {
-        [SerializeField] private FrogType frogType = FrogType.Green;
+        [SerializeField] private BallType ballType = BallType.Green;
 
-        [Tooltip("If enabled, tries to resolve a platform under the frog when it becomes active.")]
+        [Tooltip("If enabled, tries to resolve a platform under the ball when it becomes active.")]
         [SerializeField] private bool autoResolveOnEnable = true;
 
         private bool consumed;
@@ -14,7 +14,7 @@ namespace CatDrop3D.Inventory3D
         private Vector2Int registeredCell;
         private bool isRegistered;
 
-        public FrogType FrogType => frogType;
+        public BallType BallType => ballType;
 
         private void OnEnable()
         {
@@ -50,7 +50,7 @@ namespace CatDrop3D.Inventory3D
                 return;
             }
 
-            isRegistered = registeredGrid.RegisterFrog(this, registeredCell);
+            isRegistered = registeredGrid.RegisterBall(this, registeredCell);
         }
 
         private void UnregisterFromGrid()
@@ -60,7 +60,7 @@ namespace CatDrop3D.Inventory3D
                 return;
             }
 
-            registeredGrid.UnregisterFrog(this, registeredCell);
+            registeredGrid.UnregisterBall(this, registeredCell);
             isRegistered = false;
         }
 
@@ -91,7 +91,7 @@ namespace CatDrop3D.Inventory3D
             }
 
             var slot = item.GetComponent<PlatformSlot3D>();
-            if (slot != null && slot.TryAcceptFrog(this))
+            if (slot != null && slot.TryAcceptBall(this))
             {
                 consumed = true;
                 if (grid == registeredGrid)

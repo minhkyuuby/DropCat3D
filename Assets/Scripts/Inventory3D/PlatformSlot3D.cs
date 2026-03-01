@@ -6,39 +6,39 @@ namespace CatDrop3D.Inventory3D
     [RequireComponent(typeof(InventoryItem3D))]
     public sealed class PlatformSlot3D : MonoBehaviour
     {
-        [SerializeField] private FrogType acceptedType = FrogType.Green;
+        [SerializeField] private BallType acceptedType = BallType.Green;
 
         [Min(1)]
         [SerializeField] private int capacity = 3;
 
         [SerializeField] private InventoryGrid3D gridOverride;
 
-        [SerializeField, Tooltip("If enabled, resolves frogs in the same cell when the platform is placed.")]
-        private bool resolveFrogsOnPlace = true;
+        [SerializeField, Tooltip("If enabled, resolves balls in the same cell when the platform is placed.")]
+        private bool resolveBallsOnPlace = true;
 
-        [SerializeField, Tooltip("If enabled, resolves frogs whenever the platform moves to a new grid cell during play.")]
-        private bool resolveFrogsOnCellChange = true;
+        [SerializeField, Tooltip("If enabled, resolves balls whenever the platform moves to a new grid cell during play.")]
+        private bool resolveBallsOnCellChange = true;
 
-        [SerializeField, Tooltip("Current number of frogs already accepted.")]
+        [SerializeField, Tooltip("Current number of balls already accepted.")]
         private int currentCount;
 
-        public FrogType AcceptedType => acceptedType;
+        public BallType AcceptedType => acceptedType;
         public int Capacity => capacity;
         public int CurrentCount => currentCount;
-        public bool ResolveFrogsOnPlace => resolveFrogsOnPlace;
-        public bool ResolveFrogsOnCellChange => resolveFrogsOnCellChange;
+        public bool ResolveBallsOnPlace => resolveBallsOnPlace;
+        public bool ResolveBallsOnCellChange => resolveBallsOnCellChange;
 
         private Vector2Int lastCell;
         private bool hasLastCell;
 
-        public bool TryAcceptFrog(FrogItem3D frog)
+        public bool TryAcceptBall(BallItem3D ball)
         {
-            if (frog == null)
+            if (ball == null)
             {
                 return false;
             }
 
-            if (frog.FrogType != acceptedType)
+            if (ball.BallType != acceptedType)
             {
                 return false;
             }
@@ -48,7 +48,7 @@ namespace CatDrop3D.Inventory3D
                 return false;
             }
 
-            if (!IsFrogAlignedWithPlatform(frog))
+            if (!IsBallAlignedWithPlatform(ball))
             {
                 return false;
             }
@@ -63,7 +63,7 @@ namespace CatDrop3D.Inventory3D
             return true;
         }
 
-        public void ResolveFrogsInCell()
+        public void ResolveBallsInCell()
         {
             var grid = ResolveGrid();
             if (grid == null)
@@ -85,24 +85,24 @@ namespace CatDrop3D.Inventory3D
             var offsets = item.OccupiedCells(platformCell);
             foreach (var cell in offsets)
             {
-                var frogsInCell = grid.GetFrogsInCell(cell);
-                if (frogsInCell == null || frogsInCell.Count == 0)
+                var ballsInCell = grid.GetBallsInCell(cell);
+                if (ballsInCell == null || ballsInCell.Count == 0)
                 {
                     continue;
                 }
 
-                for (int i = frogsInCell.Count - 1; i >= 0; i--)
+                for (int i = ballsInCell.Count - 1; i >= 0; i--)
                 {
-                    var frog = frogsInCell[i];
-                    if (frog == null)
+                    var ball = ballsInCell[i];
+                    if (ball == null)
                     {
                         continue;
                     }
 
-                    if (TryAcceptFrog(frog))
+                    if (TryAcceptBall(ball))
                     {
-                        grid.UnregisterFrog(frog, cell);
-                        Destroy(frog.gameObject);
+                        grid.UnregisterBall(ball, cell);
+                        Destroy(ball.gameObject);
                     }
                 }
             }
@@ -110,7 +110,7 @@ namespace CatDrop3D.Inventory3D
 
         private void Update()
         {
-            if (!resolveFrogsOnCellChange)
+            if (!resolveBallsOnCellChange)
             {
                 return;
             }
@@ -129,10 +129,10 @@ namespace CatDrop3D.Inventory3D
 
             hasLastCell = true;
             lastCell = currentCell;
-            ResolveFrogsInCell();
+            ResolveBallsInCell();
         }
 
-        private bool IsFrogAlignedWithPlatform(FrogItem3D frog)
+        private bool IsBallAlignedWithPlatform(BallItem3D ball)
         {
             var grid = ResolveGrid();
             if (grid == null)
@@ -151,10 +151,10 @@ namespace CatDrop3D.Inventory3D
                 platformCell = grid.WorldToCell(item.transform.position);
             }
 
-            var frogCell = grid.WorldToCell(frog.transform.position);
+            var ballCell = grid.WorldToCell(ball.transform.position);
             foreach (var cell in item.OccupiedCells(platformCell))
             {
-                if (cell == frogCell)
+                if (cell == ballCell)
                 {
                     return true;
                 }

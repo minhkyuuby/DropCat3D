@@ -29,7 +29,7 @@ namespace CatDrop3D.Inventory3D
         [SerializeField, HideInInspector] private int maskHeight;
 
         private InventoryItem3D[,] occupancy;
-        private List<FrogItem3D>[,] frogOccupancy;
+        private List<BallItem3D>[,] ballOccupancy;
 
         public int Width => width;
         public int Height => height;
@@ -70,9 +70,9 @@ namespace CatDrop3D.Inventory3D
             {
                 occupancy = new InventoryItem3D[width, height];
             }
-            if (frogOccupancy == null || frogOccupancy.GetLength(0) != width || frogOccupancy.GetLength(1) != height)
+            if (ballOccupancy == null || ballOccupancy.GetLength(0) != width || ballOccupancy.GetLength(1) != height)
             {
-                frogOccupancy = new List<FrogItem3D>[width, height];
+                ballOccupancy = new List<BallItem3D>[width, height];
             }
             EnsureBoundaryMask();
         }
@@ -130,6 +130,11 @@ namespace CatDrop3D.Inventory3D
                 {
                     return false;
                 }
+
+                if (IsBlockedByDifferentBallType(item, cell))
+                {
+                    return false;
+                }
             }
 
             return true;
@@ -175,16 +180,16 @@ namespace CatDrop3D.Inventory3D
             item.transform.localPosition = localPos;
 
             var slot = item.GetComponent<PlatformSlot3D>();
-            if (slot != null && slot.ResolveFrogsOnPlace)
+            if (slot != null && slot.ResolveBallsOnPlace)
             {
-                slot.ResolveFrogsInCell();
+                slot.ResolveBallsInCell();
             }
         }
 
-        public bool RegisterFrog(FrogItem3D frog, Vector2Int cell)
+        public bool RegisterBall(BallItem3D ball, Vector2Int cell)
         {
             EnsureInitialized();
-            if (frog == null)
+            if (ball == null)
             {
                 return false;
             }
@@ -194,25 +199,25 @@ namespace CatDrop3D.Inventory3D
                 return false;
             }
 
-            var list = frogOccupancy[cell.x, cell.y];
+            var list = ballOccupancy[cell.x, cell.y];
             if (list == null)
             {
-                list = new List<FrogItem3D>();
-                frogOccupancy[cell.x, cell.y] = list;
+                list = new List<BallItem3D>();
+                ballOccupancy[cell.x, cell.y] = list;
             }
 
-            if (!list.Contains(frog))
+            if (!list.Contains(ball))
             {
-                list.Add(frog);
+                list.Add(ball);
             }
 
             return true;
         }
 
-        public void UnregisterFrog(FrogItem3D frog, Vector2Int cell)
+        public void UnregisterBall(BallItem3D ball, Vector2Int cell)
         {
             EnsureInitialized();
-            if (frog == null)
+            if (ball == null)
             {
                 return;
             }
@@ -222,16 +227,16 @@ namespace CatDrop3D.Inventory3D
                 return;
             }
 
-            var list = frogOccupancy[cell.x, cell.y];
+            var list = ballOccupancy[cell.x, cell.y];
             if (list == null)
             {
                 return;
             }
 
-            list.Remove(frog);
+            list.Remove(ball);
         }
 
-        public IReadOnlyList<FrogItem3D> GetFrogsInCell(Vector2Int cell)
+        public IReadOnlyList<BallItem3D> GetBallsInCell(Vector2Int cell)
         {
             EnsureInitialized();
             if (!IsInBounds(cell))
@@ -239,7 +244,7 @@ namespace CatDrop3D.Inventory3D
                 return null;
             }
 
-            return frogOccupancy[cell.x, cell.y];
+            return ballOccupancy[cell.x, cell.y];
         }
 
         public void Remove(InventoryItem3D item)
@@ -408,6 +413,37 @@ namespace CatDrop3D.Inventory3D
             }
 
             boundaryMask[y * width + x] = enabled;
+        }
+
+        private bool IsBlockedByDifferentBallType(InventoryItem3D item, Vector2Int cell)
+        {
+            var slot = item != null ? item.GetComponent<PlatformSlot3D>() : null;
+            if (slot == null)
+            {
+                return false;
+            }
+
+            var balls = GetBallsInCell(cell);
+            if (balls == null || balls.Count == 0)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < balls.Count; i++)
+            {
+                var ball = balls[i];
+                if (ball == null)
+                {
+                    continue;
+                }
+
+                if (ball.BallType != slot.AcceptedType)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
 
