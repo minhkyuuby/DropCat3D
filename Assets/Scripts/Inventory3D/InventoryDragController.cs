@@ -46,6 +46,7 @@ namespace CatDrop3D.Inventory3D
         // No longer store a fixed world-up plane; the grid can rotate.
 
         private Vector3 smoothVelocity;
+        private InventoryGridRuntimeVisualizer gridVisualizer;
 
         private InputAction runtimePointerPosition;
         private InputAction runtimePointerPress;
@@ -60,6 +61,11 @@ namespace CatDrop3D.Inventory3D
             if (grid == null)
             {
                 grid = FindFirstObjectByType<InventoryGrid3D>();
+            }
+
+            if (grid != null)
+            {
+                gridVisualizer = grid.GetComponent<InventoryGridRuntimeVisualizer>();
             }
 
             // Plane is computed per frame from the grid's oriented transform.
@@ -82,6 +88,11 @@ namespace CatDrop3D.Inventory3D
             var press = GetPointerPressAction();
             press.started -= OnPointerPressStarted;
             press.canceled -= OnPointerPressCanceled;
+
+            if (gridVisualizer != null)
+            {
+                gridVisualizer.SetRuntimeGridVisible(false);
+            }
 
             if (pointerPosition == null)
             {
@@ -148,6 +159,11 @@ namespace CatDrop3D.Inventory3D
             }
 
             draggingItem = item;
+
+            if (gridVisualizer != null)
+            {
+                gridVisualizer.SetRuntimeGridVisible(true);
+            }
 
             if (!grid.TryFindOriginCell(item, out dragStartCell))
             {
@@ -269,6 +285,10 @@ namespace CatDrop3D.Inventory3D
             }
 
             draggingItem = null;
+            if (gridVisualizer != null)
+            {
+                gridVisualizer.SetRuntimeGridVisible(false);
+            }
         }
 
         private void EnsureInputActions()

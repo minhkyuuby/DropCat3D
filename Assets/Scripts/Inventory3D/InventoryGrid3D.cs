@@ -36,8 +36,7 @@ namespace CatDrop3D.Inventory3D
         public float CellSize => cellSize;
         public Transform Frame => origin != null ? origin : transform;
         public bool UseBoundaryMask => useBoundaryMask;
-
-        private Vector3 GridCenterOffsetLocal
+        public Vector3 GridCenterOffsetLocal
             => new Vector3((width - 1) * cellSize * 0.5f, 0f, (height - 1) * cellSize * 0.5f);
 
         public Vector3 CellToLocal(Vector2Int cell, float y = 0f)
@@ -414,6 +413,7 @@ namespace CatDrop3D.Inventory3D
 
             boundaryMask[y * width + x] = enabled;
         }
+
 
         private bool IsBlockedByDifferentBallType(InventoryItem3D item, Vector2Int cell)
         {
