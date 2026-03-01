@@ -1,3 +1,5 @@
+using System;
+using System.Collections;
 using UnityEngine;
 
 namespace CatDrop3D.Inventory3D
@@ -22,14 +24,26 @@ namespace CatDrop3D.Inventory3D
         [SerializeField, Tooltip("Current number of balls already accepted.")]
         private int currentCount;
 
+        [Header("Remove Animation")]
+        [Min(0f)]
+        [SerializeField] private float pressDownDistance = 0.25f;
+
+        [Min(0f)]
+        [SerializeField] private float pressDownDuration = 0.15f;
+
         public BallType AcceptedType => acceptedType;
         public int Capacity => capacity;
         public int CurrentCount => currentCount;
+        public int CapacityLeft => Mathf.Max(0, capacity - currentCount);
         public bool ResolveBallsOnPlace => resolveBallsOnPlace;
         public bool ResolveBallsOnCellChange => resolveBallsOnCellChange;
 
+        public event Action<int> CapacityLeftChanged;
+
         private Vector2Int lastCell;
         private bool hasLastCell;
+        private bool isRemoving;
+        private Coroutine removeRoutine;
 
         public bool TryAcceptBall(BallItem3D ball)
         {
@@ -54,6 +68,7 @@ namespace CatDrop3D.Inventory3D
             }
 
             currentCount++;
+            NotifyCapacityLeftChanged();
 
             if (currentCount >= capacity)
             {
@@ -61,6 +76,11 @@ namespace CatDrop3D.Inventory3D
             }
 
             return true;
+        }
+
+        private void OnEnable()
+        {
+            NotifyCapacityLeftChanged();
         }
 
         public void ResolveBallsInCell()
@@ -101,8 +121,7 @@ namespace CatDrop3D.Inventory3D
 
                     if (TryAcceptBall(ball))
                     {
-                        grid.UnregisterBall(ball, cell);
-                        Destroy(ball.gameObject);
+                        ball.Consume();
                     }
                 }
             }
@@ -175,6 +194,13 @@ namespace CatDrop3D.Inventory3D
 
         private void RemovePlatform()
         {
+            if (isRemoving)
+            {
+                return;
+            }
+
+            isRemoving = true;
+
             var grid = ResolveGrid();
             var item = GetComponent<InventoryItem3D>();
             if (grid != null && item != null)
@@ -182,7 +208,54 @@ namespace CatDrop3D.Inventory3D
                 grid.Remove(item);
             }
 
+            if (!isActiveAndEnabled || pressDownDuration <= 0f)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            if (removeRoutine != null)
+            {
+                StopCoroutine(removeRoutine);
+            }
+
+            removeRoutine = StartCoroutine(PressDownAndDestroy(grid, item));
+        }
+
+        private IEnumerator PressDownAndDestroy(InventoryGrid3D grid, InventoryItem3D item)
+        {
+            var start = transform.position;
+            if (grid != null && item != null)
+            {
+                if (!grid.TryFindOriginCell(item, out var originCell))
+                {
+                    originCell = grid.WorldToCell(transform.position);
+                }
+
+                var localPos = grid.CellToLocal(originCell, item.YOffset);
+                transform.position = grid.Frame.TransformPoint(localPos);
+                start = transform.position;
+            }
+
+            var down = grid != null ? -grid.Frame.up : -transform.up;
+            var end = start + down * pressDownDistance;
+            float duration = Mathf.Max(0.01f, pressDownDuration);
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                transform.position = Vector3.Lerp(start, end, t);
+                yield return null;
+            }
+
             Destroy(gameObject);
+        }
+
+        private void NotifyCapacityLeftChanged()
+        {
+            CapacityLeftChanged?.Invoke(CapacityLeft);
         }
     }
 }

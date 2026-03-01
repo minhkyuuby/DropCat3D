@@ -30,6 +30,7 @@ namespace CatDrop3D.Inventory3D
 
         private InventoryItem3D[,] occupancy;
         private List<BallItem3D>[,] ballOccupancy;
+        private Dictionary<InventoryItem3D, Vector2Int> itemOrigins;
 
         public int Width => width;
         public int Height => height;
@@ -72,6 +73,10 @@ namespace CatDrop3D.Inventory3D
             if (ballOccupancy == null || ballOccupancy.GetLength(0) != width || ballOccupancy.GetLength(1) != height)
             {
                 ballOccupancy = new List<BallItem3D>[width, height];
+            }
+            if (itemOrigins == null)
+            {
+                itemOrigins = new Dictionary<InventoryItem3D, Vector2Int>();
             }
             EnsureBoundaryMask();
         }
@@ -171,6 +176,8 @@ namespace CatDrop3D.Inventory3D
                 }
             }
 
+            itemOrigins[item] = originCell;
+
             item.EnsureVisuals(cellSize);
             var frame = Frame;
             // Parent the item under the grid while preserving world rotation/scale.
@@ -254,6 +261,8 @@ namespace CatDrop3D.Inventory3D
                 return;
             }
 
+            itemOrigins?.Remove(item);
+
             if (!item.BlocksGrid)
             {
                 if (item.transform != null && item.transform.parent == Frame)
@@ -288,6 +297,11 @@ namespace CatDrop3D.Inventory3D
             if (item == null || occupancy == null)
             {
                 return false;
+            }
+
+            if (itemOrigins != null && itemOrigins.TryGetValue(item, out originCell))
+            {
+                return true;
             }
 
             // Find any occupied cell and infer origin by subtracting one of the template offsets.
@@ -361,6 +375,7 @@ namespace CatDrop3D.Inventory3D
         {
             EnsureInitialized();
             Array.Clear(occupancy, 0, occupancy.Length);
+            itemOrigins?.Clear();
 
             var items = GetComponentsInChildren<InventoryItem3D>(includeInactive: true);
             for (int i = 0; i < items.Length; i++)
@@ -377,6 +392,7 @@ namespace CatDrop3D.Inventory3D
                 }
 
                 var originCell = WorldToCell(item.transform.position);
+                itemOrigins[item] = originCell;
                 foreach (var cell in item.OccupiedCells(originCell))
                 {
                     if (IsCellValid(cell))

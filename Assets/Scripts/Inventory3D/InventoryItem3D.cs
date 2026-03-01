@@ -78,7 +78,7 @@ namespace CatDrop3D.Inventory3D
                     block = Instantiate(blockPrefab, transform);
                     block.transform.localPosition = localPos;
                     block.transform.localRotation = Quaternion.identity;
-                    block.transform.localScale = Vector3.one;
+                    block.transform.localScale = Vector3.one * (cellSize * 0.95f);
                 }
                 else
                 {

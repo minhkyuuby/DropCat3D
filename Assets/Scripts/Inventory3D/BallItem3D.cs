@@ -9,13 +9,26 @@ namespace CatDrop3D.Inventory3D
         [Tooltip("If enabled, tries to resolve a platform under the ball when it becomes active.")]
         [SerializeField] private bool autoResolveOnEnable = true;
 
+        [Header("Resolve Animation")]
+        [Min(0f)]
+        [SerializeField] private float resolveLiftHeight = 0.35f;
+
+        [Min(0f)]
+        [SerializeField] private float resolveLiftDuration = 0.2f;
+
         private bool consumed;
         private InventoryGrid3D registeredGrid;
         private Vector2Int registeredCell;
         private bool isRegistered;
+        private Coroutine resolveRoutine;
 
         public BallType BallType => ballType;
 
+        void Awake()
+        {
+            consumed = false;
+        }
+        
         private void OnEnable()
         {
             TryRegisterWithGrid();
@@ -93,13 +106,51 @@ namespace CatDrop3D.Inventory3D
             var slot = item.GetComponent<PlatformSlot3D>();
             if (slot != null && slot.TryAcceptBall(this))
             {
-                consumed = true;
-                if (grid == registeredGrid)
-                {
-                    UnregisterFromGrid();
-                }
-                Destroy(gameObject);
+                Consume();
             }
+        }
+
+        public void Consume()
+        {
+            if (consumed)
+            {
+                return;
+            }
+
+            consumed = true;
+            UnregisterFromGrid();
+
+            if (!isActiveAndEnabled || resolveLiftDuration <= 0f)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            if (resolveRoutine != null)
+            {
+                StopCoroutine(resolveRoutine);
+            }
+
+            resolveRoutine = StartCoroutine(ResolveLiftRoutine());
+        }
+
+        private System.Collections.IEnumerator ResolveLiftRoutine()
+        {
+            var start = transform.position;
+            var up = registeredGrid != null ? registeredGrid.Frame.up : Vector3.up;
+            var end = start + up * resolveLiftHeight;
+            float duration = Mathf.Max(0.01f, resolveLiftDuration);
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                transform.position = Vector3.Lerp(start, end, t);
+                yield return null;
+            }
+
+            Destroy(gameObject);
         }
     }
 }

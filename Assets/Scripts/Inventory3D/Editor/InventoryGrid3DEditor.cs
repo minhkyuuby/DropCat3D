@@ -10,7 +10,7 @@ namespace CatDrop3D.Inventory3D.Editor
     {
         private const float CellWidth = 32f;
 
-        private static bool enableSceneDrag;
+        private static bool enableSceneDrag = true;
 
         private InventoryItem3D draggingItem;
         private Vector2Int dragStartCell;
