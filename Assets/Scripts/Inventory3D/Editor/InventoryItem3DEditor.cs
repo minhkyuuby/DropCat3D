@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -9,11 +10,14 @@ namespace CatDrop3D.Inventory3D.Editor
     {
         private const float CellSize = 20f;
         private const float GridPadding = 4f;
+        private const int DefaultPreviewRadius = 4;
 
         private static readonly Color GridBackground = new Color(0.1f, 0.1f, 0.1f, 1f);
         private static readonly Color GridLine = new Color(0.2f, 0.2f, 0.2f, 1f);
         private static readonly Color CellFill = new Color(0.2f, 0.6f, 0.9f, 0.85f);
         private static readonly Color OriginFill = new Color(0.95f, 0.6f, 0.2f, 0.95f);
+
+        private int previewRadius = DefaultPreviewRadius;
 
         public override void OnInspectorGUI()
         {
@@ -21,7 +25,7 @@ namespace CatDrop3D.Inventory3D.Editor
 
             DrawScriptReference();
 
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("template"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("occupiedCells"), includeChildren: true);
             EditorGUILayout.PropertyField(serializedObject.FindProperty("autoVisualizeWithBlock"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("blockPrefab"));
 
@@ -34,7 +38,7 @@ namespace CatDrop3D.Inventory3D.Editor
             DrawClearButton();
 
             EditorGUILayout.Space();
-            DrawTemplatePreview();
+            DrawShapeEditor();
 
             serializedObject.ApplyModifiedProperties();
         }
@@ -47,7 +51,7 @@ namespace CatDrop3D.Inventory3D.Editor
                 return;
             }
 
-            using (new EditorGUI.DisabledScope(item.Template == null))
+            using (new EditorGUI.DisabledScope(!item.HasShape))
             {
                 if (GUILayout.Button("Instance Block Prefab"))
                 {
@@ -100,27 +104,39 @@ namespace CatDrop3D.Inventory3D.Editor
             }
         }
 
-        private void DrawTemplatePreview()
+        private void DrawShapeEditor()
         {
-            var templateProp = serializedObject.FindProperty("template");
-            var template = templateProp.objectReferenceValue as BlockShapeTemplate;
-
-            EditorGUILayout.LabelField("Template Shape", EditorStyles.boldLabel);
-
-            if (template == null)
+            var item = (InventoryItem3D)target;
+            if (item == null)
             {
-                EditorGUILayout.HelpBox("Assign a BlockShapeTemplate to preview its occupied cells.", MessageType.Info);
                 return;
             }
 
-            var cells = template.OccupiedCells;
+            var occupiedProp = serializedObject.FindProperty("occupiedCells");
+
+            EditorGUILayout.HelpBox(
+                "Occupied Cells are relative to the origin cell (0,0).\n" +
+                "Click cells in the grid below to toggle them.\n" +
+                "(0,0) is always included.",
+                MessageType.Info);
+
+            previewRadius = Mathf.Clamp(
+                EditorGUILayout.IntField("Preview Radius", previewRadius),
+                1,
+                20);
+
+            DrawCellToggleGrid(occupiedProp, previewRadius);
+
+            EditorGUILayout.LabelField("Shape Preview", EditorStyles.boldLabel);
+
+            var cells = item.OccupiedCellOffsets;
             if (cells == null || cells.Count == 0)
             {
-                EditorGUILayout.HelpBox("Template has no occupied cells.", MessageType.Warning);
+                EditorGUILayout.HelpBox("Shape has no occupied cells.", MessageType.Warning);
                 return;
             }
 
-            var bounds = template.CalculateLocalBounds();
+            var bounds = item.CalculateLocalBounds();
             int width = Mathf.Max(1, bounds.size.x);
             int height = Mathf.Max(1, bounds.size.y);
 
@@ -140,7 +156,95 @@ namespace CatDrop3D.Inventory3D.Editor
             var inner = new Rect(rect.x + GridPadding, rect.y + GridPadding, width * CellSize, height * CellSize);
 
             DrawGridLines(inner, width, height);
-            DrawCells(inner, template, bounds);
+            DrawCells(inner, cells, bounds);
+        }
+
+        private static void DrawCellToggleGrid(SerializedProperty occupiedCellsProp, int radius)
+        {
+            var current = ReadCells(occupiedCellsProp);
+            current.Add(Vector2Int.zero);
+
+            EditorGUILayout.LabelField("Click To Toggle", EditorStyles.boldLabel);
+
+            for (int y = radius; y >= -radius; y--)
+            {
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.FlexibleSpace();
+
+                for (int x = -radius; x <= radius; x++)
+                {
+                    var cell = new Vector2Int(x, y);
+                    bool isOrigin = cell == Vector2Int.zero;
+                    bool has = current.Contains(cell);
+
+                    using (new EditorGUI.DisabledScope(isOrigin))
+                    {
+                        var label = isOrigin ? "O" : (has ? "X" : ".");
+                        if (GUILayout.Button(label, GUILayout.Width(22), GUILayout.Height(22)))
+                        {
+                            if (has)
+                            {
+                                current.Remove(cell);
+                            }
+                            else
+                            {
+                                current.Add(cell);
+                            }
+
+                            current.Add(Vector2Int.zero);
+                            WriteCells(occupiedCellsProp, current);
+                            GUI.changed = true;
+                        }
+                    }
+                }
+
+                GUILayout.FlexibleSpace();
+                EditorGUILayout.EndHorizontal();
+            }
+        }
+
+        private static HashSet<Vector2Int> ReadCells(SerializedProperty occupiedCellsProp)
+        {
+            var set = new HashSet<Vector2Int>();
+            if (occupiedCellsProp == null || !occupiedCellsProp.isArray)
+            {
+                return set;
+            }
+
+            for (int i = 0; i < occupiedCellsProp.arraySize; i++)
+            {
+                var element = occupiedCellsProp.GetArrayElementAtIndex(i);
+                int x = element.FindPropertyRelative("x").intValue;
+                int y = element.FindPropertyRelative("y").intValue;
+                set.Add(new Vector2Int(x, y));
+            }
+
+            return set;
+        }
+
+        private static void WriteCells(SerializedProperty occupiedCellsProp, HashSet<Vector2Int> cells)
+        {
+            if (occupiedCellsProp == null || !occupiedCellsProp.isArray)
+            {
+                return;
+            }
+
+            var list = new List<Vector2Int>(cells);
+            list.Sort((a, b) =>
+            {
+                if (a == Vector2Int.zero && b != Vector2Int.zero) return -1;
+                if (b == Vector2Int.zero && a != Vector2Int.zero) return 1;
+                int cy = b.y.CompareTo(a.y);
+                return cy != 0 ? cy : a.x.CompareTo(b.x);
+            });
+
+            occupiedCellsProp.arraySize = list.Count;
+            for (int i = 0; i < list.Count; i++)
+            {
+                var element = occupiedCellsProp.GetArrayElementAtIndex(i);
+                element.FindPropertyRelative("x").intValue = list[i].x;
+                element.FindPropertyRelative("y").intValue = list[i].y;
+            }
         }
 
         private static void DrawGridLines(Rect area, int width, int height)
@@ -160,9 +264,8 @@ namespace CatDrop3D.Inventory3D.Editor
             }
         }
 
-        private static void DrawCells(Rect area, BlockShapeTemplate template, BoundsInt bounds)
+        private static void DrawCells(Rect area, IReadOnlyList<Vector2Int> cells, BoundsInt bounds)
         {
-            var cells = template.OccupiedCells;
             if (cells == null)
             {
                 return;

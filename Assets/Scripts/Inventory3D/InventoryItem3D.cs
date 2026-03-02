@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -5,7 +6,8 @@ namespace CatDrop3D.Inventory3D
 {
     public sealed class InventoryItem3D : MonoBehaviour
     {
-        [SerializeField] private BlockShapeTemplate template;
+        [Tooltip("Cells occupied by this item, relative to its origin cell.")]
+        [SerializeField] private List<Vector2Int> occupiedCells = new List<Vector2Int> { Vector2Int.zero };
         public bool autoVisualizeWithBlock = true;
 
         [Header("Behavior")]
@@ -22,40 +24,37 @@ namespace CatDrop3D.Inventory3D
         [Tooltip("Vertical lift so the item doesn't z-fight with the grid plane.")]
         [SerializeField] private float yOffset = 0.05f;
 
-        public BlockShapeTemplate Template => template;
+        public IReadOnlyList<Vector2Int> OccupiedCellOffsets => occupiedCells;
         public bool BlocksGrid => blocksGrid;
         public bool DraggableAtRuntime => draggableAtRuntime;
+        public bool HasShape => occupiedCells != null && occupiedCells.Count > 0;
 
-        public void SetTemplate(BlockShapeTemplate newTemplate)
+        public void SetOccupiedCells(List<Vector2Int> cells)
         {
-            template = newTemplate;
-            if (template != null)
-            {
-                template.Validate();
-            }
+            occupiedCells = cells;
+            ValidateShape();
         }
 
         public float YOffset => yOffset;
 
         public IEnumerable<Vector2Int> OccupiedCells(Vector2Int originCell)
         {
-            if (template == null)
+            if (occupiedCells == null || occupiedCells.Count == 0)
             {
                 yield return originCell;
                 yield break;
             }
 
-            var cells = template.OccupiedCells;
-            for (int i = 0; i < cells.Count; i++)
+            for (int i = 0; i < occupiedCells.Count; i++)
             {
-                yield return originCell + cells[i];
+                yield return originCell + occupiedCells[i];
             }
         }
 
         public void EnsureVisuals(float cellSize, bool force = false)
         {
             if (!force && !autoVisualizeWithBlock) return;
-            if (template == null)
+            if (occupiedCells == null || occupiedCells.Count == 0)
             {
                 return;
             }
@@ -66,10 +65,9 @@ namespace CatDrop3D.Inventory3D
                 return;
             }
 
-            var cells = template.OccupiedCells;
-            for (int i = 0; i < cells.Count; i++)
+            for (int i = 0; i < occupiedCells.Count; i++)
             {
-                var offset = cells[i];
+                var offset = occupiedCells[i];
                 var localPos = new Vector3(offset.x * cellSize, 0f, offset.y * cellSize);
 
                 GameObject block;
@@ -100,10 +98,63 @@ namespace CatDrop3D.Inventory3D
 
         private void OnValidate()
         {
-            if (template != null)
+            ValidateShape();
+        }
+
+        public void ValidateShape()
+        {
+            if (occupiedCells == null)
             {
-                template.Validate();
+                occupiedCells = new List<Vector2Int> { Vector2Int.zero };
+                return;
             }
+
+            if (occupiedCells.Count == 0)
+            {
+                occupiedCells.Add(Vector2Int.zero);
+                return;
+            }
+
+            var seen = new HashSet<Vector2Int>();
+            for (int i = occupiedCells.Count - 1; i >= 0; i--)
+            {
+                var cell = occupiedCells[i];
+                if (seen.Contains(cell))
+                {
+                    occupiedCells.RemoveAt(i);
+                    continue;
+                }
+                seen.Add(cell);
+            }
+
+            if (!seen.Contains(Vector2Int.zero))
+            {
+                occupiedCells.Add(Vector2Int.zero);
+            }
+        }
+
+        public BoundsInt CalculateLocalBounds()
+        {
+            if (occupiedCells == null || occupiedCells.Count == 0)
+            {
+                return new BoundsInt(0, 0, 0, 1, 1, 1);
+            }
+
+            int minX = int.MaxValue;
+            int minY = int.MaxValue;
+            int maxX = int.MinValue;
+            int maxY = int.MinValue;
+
+            for (int i = 0; i < occupiedCells.Count; i++)
+            {
+                var c = occupiedCells[i];
+                minX = Math.Min(minX, c.x);
+                minY = Math.Min(minY, c.y);
+                maxX = Math.Max(maxX, c.x);
+                maxY = Math.Max(maxY, c.y);
+            }
+
+            return new BoundsInt(minX, minY, 0, (maxX - minX) + 1, (maxY - minY) + 1, 1);
         }
     }
 }

@@ -160,6 +160,12 @@ namespace CatDrop3D.Inventory3D
 
             draggingItem = item;
 
+            var slot = draggingItem.GetComponent<PlatformSlot3D>();
+            if (slot != null)
+            {
+                slot.SetGridOverride(grid);
+            }
+
             if (gridVisualizer != null)
             {
                 gridVisualizer.SetRuntimeGridVisible(true);
@@ -277,11 +283,24 @@ namespace CatDrop3D.Inventory3D
                     var localP = grid.CellToLocal(lastValidCell, draggingItem.YOffset);
                     var worldP = frame2.TransformPoint(localP);
                     draggingItem.transform.position = worldP;
+
+                    var slotEarly = draggingItem.GetComponent<PlatformSlot3D>();
+                    if (slotEarly != null)
+                    {
+                        slotEarly.SetGridOverride(null);
+                    }
+
                     draggingItem = null;
                     return;
                 }
 
                 grid.Place(draggingItem, dragStartCell);
+            }
+
+            var slot = draggingItem != null ? draggingItem.GetComponent<PlatformSlot3D>() : null;
+            if (slot != null)
+            {
+                slot.SetGridOverride(null);
             }
 
             draggingItem = null;

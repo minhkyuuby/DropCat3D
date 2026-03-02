@@ -45,6 +45,12 @@ namespace CatDrop3D.Inventory3D
         private bool isRemoving;
         private Coroutine removeRoutine;
 
+        public void SetGridOverride(InventoryGrid3D grid)
+        {
+            gridOverride = grid;
+            hasLastCell = false;
+        }
+
         public bool TryAcceptBall(BallItem3D ball)
         {
             if (ball == null)

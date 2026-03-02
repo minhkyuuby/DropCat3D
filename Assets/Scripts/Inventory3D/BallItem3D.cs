@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace CatDrop3D.Inventory3D
@@ -23,6 +24,8 @@ namespace CatDrop3D.Inventory3D
         private Coroutine resolveRoutine;
 
         public BallType BallType => ballType;
+
+        public static event Action<BallItem3D> BallResolved;
 
         void Awake()
         {
@@ -119,6 +122,7 @@ namespace CatDrop3D.Inventory3D
 
             consumed = true;
             UnregisterFromGrid();
+            BallResolved?.Invoke(this);
 
             if (!isActiveAndEnabled || resolveLiftDuration <= 0f)
             {

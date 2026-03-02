@@ -13,8 +13,11 @@ namespace CatDrop3D.Inventory3D.Editor
         private static bool enableSceneDrag = true;
 
         private InventoryItem3D draggingItem;
+        private BallItem3D draggingBall;
         private Vector2Int dragStartCell;
         private Vector2Int lastValidCell;
+        private Vector2Int lastBallCell;
+        private int dragControlId;
 
         public override void OnInspectorGUI()
         {
@@ -68,6 +71,13 @@ namespace CatDrop3D.Inventory3D.Editor
             EditorGUILayout.Space(8);
             EditorGUILayout.LabelField("Grid Status", EditorStyles.boldLabel);
 
+            if (GUILayout.Button("Validate Items On Start"))
+            {
+                Undo.RecordObject(grid, "Validate Grid Items");
+                grid.RunGridSetup();
+                EditorUtility.SetDirty(grid);
+            }
+
             DrawGrid(grid);
             serializedObject.ApplyModifiedProperties();
         }
@@ -96,26 +106,47 @@ namespace CatDrop3D.Inventory3D.Editor
                 return;
             }
 
-            var ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
-            var frame = grid.Frame;
-            var plane = new Plane(frame.up, frame.position);
-
-            if (!plane.Raycast(ray, out float enter))
+            if (dragControlId == 0)
             {
-                return;
+                dragControlId = GUIUtility.GetControlID(FocusType.Passive);
             }
 
-            var world = ray.GetPoint(enter);
-            var cell = grid.WorldToCell(world);
+            if (e.type == EventType.Layout)
+            {
+                HandleUtility.AddDefaultControl(dragControlId);
+            }
 
             if (e.type == EventType.MouseDown && e.button == 0)
             {
+                grid.RebuildOccupancyFromItems();
+                grid.RebuildBallOccupancyFromScene();
                 var picked = HandleUtility.PickGameObject(e.mousePosition, false);
                 var item = picked != null ? picked.GetComponentInParent<InventoryItem3D>() : null;
+                var ball = picked != null ? picked.GetComponentInParent<BallItem3D>() : null;
+                if (item == null)
+                {
+                    var ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
+                    var frame = grid.Frame;
+                    var plane = new Plane(frame.up, frame.position);
+                    if (plane.Raycast(ray, out float enter))
+                    {
+                        var world = ray.GetPoint(enter);
+                        var cell = grid.WorldToCell(world);
+                        item = grid.GetCellItem(cell.x, cell.y);
+                        if (item == null)
+                        {
+                            var ballsInCell = grid.GetBallsInCell(cell);
+                            if (ballsInCell != null && ballsInCell.Count > 0)
+                            {
+                                ball = ballsInCell[0];
+                            }
+                        }
+                    }
+                }
                 if (item != null)
                 {
+                    GUIUtility.hotControl = dragControlId;
                     draggingItem = item;
-                    grid.RebuildOccupancyFromItems();
                     grid.Remove(draggingItem);
 
                     dragStartCell = grid.WorldToCell(item.transform.position);
@@ -124,15 +155,55 @@ namespace CatDrop3D.Inventory3D.Editor
                     Undo.RecordObject(draggingItem.transform, "Move Inventory Item");
                     e.Use();
                 }
+                else if (ball != null)
+                {
+                    GUIUtility.hotControl = dragControlId;
+                    draggingBall = ball;
+                    lastBallCell = grid.WorldToCell(ball.transform.position);
+                    Undo.RecordObject(draggingBall.transform, "Move Ball");
+                    e.Use();
+                }
             }
             else if (draggingItem != null && (e.type == EventType.MouseDrag || e.type == EventType.MouseMove))
             {
+                var ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
+                var frame = grid.Frame;
+                var plane = new Plane(frame.up, frame.position);
+                if (!plane.Raycast(ray, out float enter))
+                {
+                    return;
+                }
+
+                var world = ray.GetPoint(enter);
+                var cell = grid.WorldToCell(world);
+
                 if (grid.CanPlace(draggingItem, cell))
                 {
                     lastValidCell = cell;
                 }
 
                 MoveItemToCell(grid, draggingItem, lastValidCell);
+                SceneView.RepaintAll();
+                e.Use();
+            }
+            else if (draggingBall != null && (e.type == EventType.MouseDrag || e.type == EventType.MouseMove))
+            {
+                var ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
+                var frame = grid.Frame;
+                var plane = new Plane(frame.up, frame.position);
+                if (!plane.Raycast(ray, out float enter))
+                {
+                    return;
+                }
+
+                var world = ray.GetPoint(enter);
+                var cell = grid.WorldToCell(world);
+                if (grid.IsCellValid(cell))
+                {
+                    lastBallCell = cell;
+                }
+
+                MoveBallToCell(grid, draggingBall, lastBallCell);
                 SceneView.RepaintAll();
                 e.Use();
             }
@@ -148,6 +219,25 @@ namespace CatDrop3D.Inventory3D.Editor
                 }
 
                 draggingItem = null;
+                if (GUIUtility.hotControl == dragControlId)
+                {
+                    GUIUtility.hotControl = 0;
+                }
+                e.Use();
+            }
+            else if (draggingBall != null && e.type == EventType.MouseUp && e.button == 0)
+            {
+                if (grid.IsCellValid(lastBallCell))
+                {
+                    MoveBallToCell(grid, draggingBall, lastBallCell);
+                }
+
+                grid.RebuildBallOccupancyFromScene();
+                draggingBall = null;
+                if (GUIUtility.hotControl == dragControlId)
+                {
+                    GUIUtility.hotControl = 0;
+                }
                 e.Use();
             }
         }
@@ -250,6 +340,15 @@ namespace CatDrop3D.Inventory3D.Editor
             var localPos = grid.CellToLocal(cell, item.YOffset);
             var worldPos = grid.Frame.TransformPoint(localPos);
             item.transform.position = worldPos;
+        }
+
+        private static void MoveBallToCell(InventoryGrid3D grid, BallItem3D ball, Vector2Int cell)
+        {
+            var frame = grid.Frame;
+            var local = frame.InverseTransformPoint(ball.transform.position);
+            var localPos = grid.CellToLocal(cell, local.y);
+            var worldPos = frame.TransformPoint(localPos);
+            ball.transform.position = worldPos;
         }
     }
 }

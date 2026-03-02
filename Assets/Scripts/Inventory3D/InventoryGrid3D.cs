@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace CatDrop3D.Inventory3D
 {
-    public sealed class InventoryGrid3D : MonoBehaviour
+    public sealed partial class InventoryGrid3D : MonoBehaviour
     {
         [Header("Grid")]
         [Min(1)]
@@ -55,6 +55,11 @@ namespace CatDrop3D.Inventory3D
             occupancy = new InventoryItem3D[width, height];
         }
 
+        private void Start()
+        {
+            RunGridSetup();
+        }
+
         private void OnValidate()
         {
             if (origin == null)
@@ -62,6 +67,49 @@ namespace CatDrop3D.Inventory3D
                 origin = transform;
             }
             EnsureBoundaryMask();
+        }
+
+        public void ValidateItemsOnStart()
+        {
+            var items = GetComponentsInChildren<InventoryItem3D>(includeInactive: true);
+            for (int i = 0; i < items.Length; i++)
+            {
+                var item = items[i];
+                if (item == null)
+                {
+                    continue;
+                }
+
+                var originCell = WorldToCell(item.transform.position);
+                bool isValid = true;
+                foreach (var cell in item.OccupiedCells(originCell))
+                {
+                    if (!IsCellValid(cell))
+                    {
+                        isValid = false;
+                        break;
+                    }
+                }
+
+                if (!isValid)
+                {
+                    if (Application.isPlaying)
+                    {
+                        Destroy(item.gameObject);
+                    }
+                    else
+                    {
+                        DestroyImmediate(item.gameObject);
+                    }
+                }
+            }
+        }
+
+        public void RunGridSetup()
+        {
+            EnsureInitialized();
+            ValidateItemsOnStart();
+            RebuildOccupancyFromItems();
         }
 
         private void EnsureInitialized()
@@ -186,72 +234,12 @@ namespace CatDrop3D.Inventory3D
             item.transform.localPosition = localPos;
 
             var slot = item.GetComponent<PlatformSlot3D>();
-            if (slot != null && slot.ResolveBallsOnPlace)
+            if (Application.isPlaying && slot != null && slot.ResolveBallsOnPlace)
             {
                 slot.ResolveBallsInCell();
             }
         }
 
-        public bool RegisterBall(BallItem3D ball, Vector2Int cell)
-        {
-            EnsureInitialized();
-            if (ball == null)
-            {
-                return false;
-            }
-
-            if (!IsCellValid(cell))
-            {
-                return false;
-            }
-
-            var list = ballOccupancy[cell.x, cell.y];
-            if (list == null)
-            {
-                list = new List<BallItem3D>();
-                ballOccupancy[cell.x, cell.y] = list;
-            }
-
-            if (!list.Contains(ball))
-            {
-                list.Add(ball);
-            }
-
-            return true;
-        }
-
-        public void UnregisterBall(BallItem3D ball, Vector2Int cell)
-        {
-            EnsureInitialized();
-            if (ball == null)
-            {
-                return;
-            }
-
-            if (!IsInBounds(cell))
-            {
-                return;
-            }
-
-            var list = ballOccupancy[cell.x, cell.y];
-            if (list == null)
-            {
-                return;
-            }
-
-            list.Remove(ball);
-        }
-
-        public IReadOnlyList<BallItem3D> GetBallsInCell(Vector2Int cell)
-        {
-            EnsureInitialized();
-            if (!IsInBounds(cell))
-            {
-                return null;
-            }
-
-            return ballOccupancy[cell.x, cell.y];
-        }
 
         public void Remove(InventoryItem3D item)
         {
@@ -304,7 +292,7 @@ namespace CatDrop3D.Inventory3D
                 return true;
             }
 
-            // Find any occupied cell and infer origin by subtracting one of the template offsets.
+            // Find any occupied cell and infer origin by subtracting one of the shape offsets.
             // Default to assuming (0,0) offset exists.
             Vector2Int? anyCell = null;
             for (int x = 0; x < width && anyCell == null; x++)
@@ -324,15 +312,14 @@ namespace CatDrop3D.Inventory3D
                 return false;
             }
 
-            var template = item.Template;
-            if (template == null || template.OccupiedCells.Count == 0)
+            var offsets = item.OccupiedCellOffsets;
+            if (offsets == null || offsets.Count == 0)
             {
                 originCell = anyCell.Value;
                 return true;
             }
 
             // Prefer offset (0,0) if present.
-            var offsets = template.OccupiedCells;
             for (int i = 0; i < offsets.Count; i++)
             {
                 if (offsets[i] == Vector2Int.zero)
@@ -345,168 +332,6 @@ namespace CatDrop3D.Inventory3D
             // Otherwise use first offset.
             originCell = anyCell.Value - offsets[0];
             return true;
-        }
-
-        private void OnDrawGizmosSelected()
-        {
-            var frame = Frame;
-            Gizmos.color = new Color(0f, 1f, 1f, 0.25f);
-            var prevMatrix = Gizmos.matrix;
-            Gizmos.matrix = frame.localToWorldMatrix;
-            var offset = GridCenterOffsetLocal;
-            for (int x = 0; x < width; x++)
-            {
-                for (int y = 0; y < height; y++)
-                {
-                    var p = new Vector3(x * cellSize, 0f, y * cellSize) - offset;
-                    Gizmos.DrawWireCube(p, new Vector3(cellSize, 0.01f, cellSize));
-                    if (!IsCellValid(new Vector2Int(x, y)))
-                    {
-                        Gizmos.color = new Color(1f, 0.2f, 0.2f, 0.2f);
-                        Gizmos.DrawCube(p, new Vector3(cellSize, 0.005f, cellSize));
-                        Gizmos.color = new Color(0f, 1f, 1f, 0.25f);
-                    }
-                }
-            }
-            Gizmos.matrix = prevMatrix;
-        }
-
-        public void RebuildOccupancyFromItems()
-        {
-            EnsureInitialized();
-            Array.Clear(occupancy, 0, occupancy.Length);
-            itemOrigins?.Clear();
-
-            var items = GetComponentsInChildren<InventoryItem3D>(includeInactive: true);
-            for (int i = 0; i < items.Length; i++)
-            {
-                var item = items[i];
-                if (item == null)
-                {
-                    continue;
-                }
-
-                if (!item.BlocksGrid)
-                {
-                    continue;
-                }
-
-                var originCell = WorldToCell(item.transform.position);
-                itemOrigins[item] = originCell;
-                foreach (var cell in item.OccupiedCells(originCell))
-                {
-                    if (IsCellValid(cell))
-                    {
-                        occupancy[cell.x, cell.y] = item;
-                    }
-                }
-            }
-        }
-
-        public void SetBoundaryMaskEnabled(bool enabled)
-        {
-            useBoundaryMask = enabled;
-        }
-
-        public bool GetBoundaryMaskCell(int x, int y)
-        {
-            EnsureBoundaryMask();
-            if (x < 0 || x >= width || y < 0 || y >= height)
-            {
-                return false;
-            }
-
-            return GetMaskCell(x, y);
-        }
-
-        public void SetBoundaryMaskCell(int x, int y, bool enabled)
-        {
-            EnsureBoundaryMask();
-            if (x < 0 || x >= width || y < 0 || y >= height)
-            {
-                return;
-            }
-
-            boundaryMask[y * width + x] = enabled;
-        }
-
-
-        private bool IsBlockedByDifferentBallType(InventoryItem3D item, Vector2Int cell)
-        {
-            var slot = item != null ? item.GetComponent<PlatformSlot3D>() : null;
-            if (slot == null)
-            {
-                return false;
-            }
-
-            var balls = GetBallsInCell(cell);
-            if (balls == null || balls.Count == 0)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < balls.Count; i++)
-            {
-                var ball = balls[i];
-                if (ball == null)
-                {
-                    continue;
-                }
-
-                if (ball.BallType != slot.AcceptedType)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-
-        private void EnsureBoundaryMask()
-        {
-            int size = Mathf.Max(0, width * height);
-            if (boundaryMask == null || boundaryMask.Length != size || maskWidth != width || maskHeight != height)
-            {
-                var oldMask = boundaryMask;
-                int oldWidth = maskWidth;
-                int oldHeight = maskHeight;
-                boundaryMask = new bool[size];
-
-                for (int i = 0; i < boundaryMask.Length; i++)
-                {
-                    boundaryMask[i] = true;
-                }
-
-                if (oldMask != null && oldMask.Length > 0 && oldWidth > 0 && oldHeight > 0)
-                {
-                    int copyWidth = Mathf.Min(oldWidth, width);
-                    int copyHeight = Mathf.Min(oldHeight, height);
-                    for (int y = 0; y < copyHeight; y++)
-                    {
-                        for (int x = 0; x < copyWidth; x++)
-                        {
-                            int oldIndex = y * oldWidth + x;
-                            int newIndex = y * width + x;
-                            boundaryMask[newIndex] = oldMask[oldIndex];
-                        }
-                    }
-                }
-
-                maskWidth = width;
-                maskHeight = height;
-            }
-        }
-
-        private bool GetMaskCell(int x, int y)
-        {
-            int index = y * width + x;
-            if (boundaryMask == null || index < 0 || index >= boundaryMask.Length)
-            {
-                return false;
-            }
-
-            return boundaryMask[index];
         }
 
     }

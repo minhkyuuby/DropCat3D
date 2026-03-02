@@ -224,7 +224,7 @@ MonoBehaviour:
   blocksGrid: 1
   draggableAtRuntime: 1
   blockPrefab: {fileID: 6460036851022944283, guid: de28cb47b086b774f8face55dc2d9932, type: 3}
-  yOffset: 0.05
+  yOffset: -0.3
 --- !u!114 &2625600588200836593
 MonoBehaviour:
   m_ObjectHideFlags: 0

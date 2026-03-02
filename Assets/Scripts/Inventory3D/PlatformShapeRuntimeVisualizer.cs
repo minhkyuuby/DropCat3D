@@ -64,16 +64,17 @@ namespace CatDrop3D.Inventory3D
         private void DrawOutline(InventoryGrid3D grid)
         {
             var occupied = new HashSet<Vector2Int>();
-            if (item.Template != null)
+            var offsets = item.OccupiedCellOffsets;
+            if (offsets == null || offsets.Count == 0)
             {
-                foreach (var cell in item.Template.OccupiedCells)
-                {
-                    occupied.Add(cell);
-                }
+                occupied.Add(Vector2Int.zero);
             }
             else
             {
-                occupied.Add(Vector2Int.zero);
+                for (int i = 0; i < offsets.Count; i++)
+                {
+                    occupied.Add(offsets[i]);
+                }
             }
 
             float half = grid.CellSize * 0.5f;
